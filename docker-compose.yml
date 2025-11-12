@@ -34,6 +34,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - xnat-db
+      - mock-llm
     environment:
       - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME}
       - XNAT_HOME=${XNAT_HOME}
@@ -69,6 +70,19 @@ services:
       - xnat-web
     links:
       - xnat-web
+
+  mock-llm:
+    container_name: mock-llm
+    image: node:20-alpine
+    working_dir: /app
+    command: ["node", "mock-llm-server.js", "8081"]
+    volumes:
+      - ../xnat_chat_assistant_plugin/mocks/node:/app:ro
+    expose:
+      - 8081
+    networks:
+      - xnat-network
+    restart: unless-stopped
 
 networks:
   xnat-network:
