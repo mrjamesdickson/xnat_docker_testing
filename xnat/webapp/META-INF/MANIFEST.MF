@@ -1,0 +1,13 @@
+Manifest-Version: 1.0
+Application-Name: XNAT
+Implementation-CleanTag: false
+Implementation-Branch: fix-section-widths
+Build-Date: Mon Nov 17 20:22:39 EST 2025
+Build-Number: Manual
+Implementation-Version: 1.9.2.1
+Implementation-Sha-Full: be80e90166cff1f7395726b63e9e08844079ca7b
+Implementation-Sha: be80e90166
+Implementation-Dirty: true
+Implementation-Commit: 0
+Implementation-LastTag: 1.9.2.1
+

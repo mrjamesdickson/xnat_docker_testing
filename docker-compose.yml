@@ -1,5 +1,6 @@
 services:
 
+  
   xnat-web:
     container_name: xnat-web
     build:
@@ -21,12 +22,13 @@ services:
         XNAT_ROOT: ${XNAT_ROOT}
         XNAT_HOME: ${XNAT_HOME}
         XNAT_EMAIL: ${XNAT_EMAIL}
-    ports:
-      - 8104:8104
+    expose:
+      - 8080
     networks:
       - xnat-network
     volumes:
       - ./xnat/plugins:${XNAT_HOME}/plugins
+      - ./xnat/webapp:/usr/local/tomcat/webapps/ROOT
       - ./xnat-data/home/logs:${XNAT_HOME}/logs
       - ./xnat-data/archive:${XNAT_ROOT}/archive
       - ./xnat-data/build:${XNAT_ROOT}/build
@@ -63,7 +65,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
     ports:
-      - 80:80
+      - "${XNAT_HOST_PORT:-80}:80"
     networks:
       - xnat-network
     depends_on:
@@ -87,4 +89,3 @@ services:
 networks:
   xnat-network:
     name: xnat-network
-

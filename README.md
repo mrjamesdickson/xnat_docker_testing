@@ -15,7 +15,7 @@ This document contains the following sections:
 
 ## Introduction
 
-This repository contains files to bootstrap XNAT deployment. The build creates three containers:
+This repository contains files to bootstrap XNAT deployment. The build creates three core containers:
 
 - **[Tomcat](http://tomcat.apache.org/) + XNAT**: The XNAT web application
 - [**Postgres**](https://www.postgresql.org/): The XNAT database
@@ -82,6 +82,10 @@ $ cp default.env .env
     xnat-web  | 08-Jul-2025 22:22:03.924 INFO [main] org.apache.catalina.startup.Catalina.start Server startup in [43522] milliseconds
     ```
 
+    Once nginx reports ready you can:
+
+    - open `http://localhost:${XNAT_HOST_PORT:-80}` (or whatever host/port you mapped) to reach XNAT
+
 5. First XNAT Site Setup! Your XNAT will soon be available at [http://localhost](http://localhost). After logging in with credentials `admin`/`admin` (the default username and password, respectively), the setup page should be displayed.
 
 ## Mounted Data
@@ -126,7 +130,8 @@ XNAT\_DATASOURCE\_PASSWORD | Specifies the password for the XNAT database accoun
 XNAT\_WEBAPP\_FOLDER | Indicates the name of the folder for the XNAT application. This affects the context path for accessing XNAT. The value `ROOT` indicates that XNAT is the root application and can be accessed at http://localhost (i.e. no path). Otherwise, you must add this value to the _end_ of the URL so, e.g. if you specify `xnat` for this variable, you'll access XNAT at http://localhost/xnat. | `ROOT`
 XNAT\_ROOT | Indicates the location of the root XNAT folder on the XNAT container. | `/data/xnat`
 XNAT\_HOME | Indicates the location of the XNAT user's home folder on the XNAT container. | `/data/xnat/home`
-XNAT\_EMAIL | Specifies the primary administrator email address. | `harmitage@miskatonic.edu`
+XNAT\_EMAIL | Specifies the primary administrator email address. | `admin@example.com`
+XNAT\_HOST\_PORT | Host port published by nginx for XNAT HTTP traffic. | `80`
 XNAT\_ACTIVEMQ\_URL | Indicates the URL for an external ActiveMQ service to use for messaging. If not specified, XNAT uses its own internal queue. |
 XNAT\_ACTIVEMQ\_USERNAME | Indicates the username to use to authenticate with the configured ActiveMQ server. Has no effect if **XNAT\_ACTIVEMQ\_URL** isn't specified. |
 XNAT\_ACTIVEMQ\_PASSWORD | Indicates the password to use to authenticate with the configured ActiveMQ server. Has no effect if **XNAT\_ACTIVEMQ\_URL** isn't specified. |

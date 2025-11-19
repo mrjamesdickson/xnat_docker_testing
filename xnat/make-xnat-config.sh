@@ -17,13 +17,13 @@ hibernate.cache.use_query_cache=true
 spring.http.multipart.max-file-size=1073741824
 spring.http.multipart.max-request-size=1073741824
 
-# Chat Assistant Plugin - LLM Configuration
-chat.llm.rest.profiles=default
-chat.llm.rest.profile.default.endpoints=http://mock-llm:8081
-chat.llm.rest.profile.default.model=mock-model
-chat.llm.rest.profile.default.weights=1
+# Chat Assistant Plugin - LLM Configuration (Ollama)
+chat.llm.rest.profiles=ollama
+chat.llm.rest.profile.ollama.endpoints=http://host.docker.internal:11434
+chat.llm.rest.profile.ollama.model=llama3.2:3b
+chat.llm.rest.profile.ollama.weights=1
 chat.llm.rest.timeout.ms=60000
-chat.llm.rest.path=/v1/completions
+chat.llm.rest.path=/api/generate
 EOF
 fi
 
