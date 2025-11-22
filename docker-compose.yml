@@ -27,7 +27,7 @@ services:
     networks:
       - xnat-network
     extra_hosts:
-      - "demo02.xnatworks.io:192.168.1.161"
+      - "demo02.xnatworks.io:192.168.1.67"
     volumes:
       - ./xnat/plugins:${XNAT_HOME}/plugins
       - ./xnat/webapp:/usr/local/tomcat/webapps/ROOT
