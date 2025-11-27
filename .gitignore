@@ -21,3 +21,19 @@ xnat/webapps
 *.env
 !default.env
 
+demo02_xnat_dump.sql
+xnat_incomplete_dump.sql
+xnat/plugins_backup_all/
+
+# Extracted webapp (large, regenerated)
+xnat/webapp/
+
+# Test data and environments
+sample-data/
+venv/
+
+# Themes (test/sample)
+themes/
+
+# macOS
+.DS_Store

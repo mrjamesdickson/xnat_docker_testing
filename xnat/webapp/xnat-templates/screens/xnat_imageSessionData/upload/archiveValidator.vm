@@ -1,3 +1,0 @@
-<script type="text/javascript">
-    XNAT.app.archiveValidator.fail_merge_on=$siteConfig.formattedFailMergeOn;
-</script>

@@ -1,4 +1,0 @@
-#set ($template = $data.getTemplateInfo())
-$!template.setLayoutTemplate("Content.vm")
-
-<p>It's blank.</p>
