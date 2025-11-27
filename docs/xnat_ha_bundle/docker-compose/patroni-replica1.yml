@@ -1,0 +1,58 @@
+scope: xnat
+namespace: /service/
+name: replica1
+
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: patroni-replica1:8008
+
+etcd:
+  host: patroni-etcd:2379
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    postgresql:
+      parameters:
+        wal_level: replica
+        hot_standby: "on"
+        max_wal_senders: 10
+        max_replication_slots: 10
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+  users:
+    xnat:
+      password: xnat
+      options:
+        - createdb
+    replicator:
+      password: replpassword
+      options:
+        - replication
+
+postgresql:
+  listen: 0.0.0.0:5432
+  connect_address: patroni-replica1:5432
+  data_dir: /var/lib/postgresql/data
+  authentication:
+    superuser:
+      username: postgres
+      password: supersecret
+    replication:
+      username: replicator
+      password: replpassword
+  parameters:
+    shared_buffers: 256MB
+    wal_keep_size: 64
+    max_connections: 200
+    hot_standby: "on"
+
+tags:
+  nofailover: false
+  noloadbalance: false
+  clonefrom: true
+  nosync: false

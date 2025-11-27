@@ -92,19 +92,101 @@ echo "🗂️  Installed plugins in $PLUGINS_DIR:"
 ls -lh "$PLUGINS_DIR"/xnat_*.jar 2>/dev/null || echo "   (none)"
 echo ""
 
-echo "🔄 Restarting XNAT..."
+echo "🔄 Restarting XNAT cluster..."
+echo ""
+
+# Get list of all web containers (xnat-web, xnat-web-2, etc.)
+WEB_CONTAINERS=$(docker-compose ps --services 2>/dev/null | grep "^xnat-web" | tr '\n' ' ')
+
+if [ -z "$WEB_CONTAINERS" ]; then
+    WEB_CONTAINERS="xnat-web"
+fi
+
+echo "   📋 Web containers to restart: $WEB_CONTAINERS"
 echo ""
 
 # Check if containers are running
-if docker-compose ps xnat-web | grep -q "Up"; then
-    docker-compose restart xnat-web
-    echo "   ⏳ Waiting for XNAT to restart (30 seconds)..."
-    sleep 30
+if docker-compose ps xnat-web 2>/dev/null | grep -q "Up"; then
+    # Restart ALL web containers (required for shared webapp/plugins volume)
+    docker-compose restart $WEB_CONTAINERS
 else
     echo "   ⚠️  XNAT container not running. Starting now..."
     docker-compose up -d
-    echo "   ⏳ Waiting for XNAT to start (60 seconds)..."
-    sleep 60
+fi
+
+# Wait for primary node to be healthy with progress indicator
+echo ""
+echo "   ⏳ Waiting for XNAT cluster to start..."
+MAX_WAIT=300  # 5 minutes max
+WAIT_INTERVAL=10
+ELAPSED=0
+
+while [ $ELAPSED -lt $MAX_WAIT ]; do
+    # Check primary node health via internal curl
+    STATUS=$(docker exec xnat-web curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:8080/ 2>/dev/null || echo "000")
+
+    if [ "$STATUS" = "302" ]; then
+        echo ""
+        echo "   ✅ Primary node (xnat-web) is ready after ${ELAPSED}s"
+        break
+    fi
+
+    # Show progress
+    printf "   ⏳ Waiting... %ds (status: %s)\r" "$ELAPSED" "$STATUS"
+    sleep $WAIT_INTERVAL
+    ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+done
+
+if [ $ELAPSED -ge $MAX_WAIT ]; then
+    echo ""
+    echo "   ⚠️  Timeout waiting for primary node. Continuing anyway..."
+fi
+
+# Give other nodes a bit more time
+echo "   ⏳ Waiting 30s for remaining nodes..."
+sleep 30
+
+# Restart nginx to refresh DNS (container IPs may have changed)
+echo ""
+echo "🔄 Restarting nginx to refresh DNS..."
+docker-compose restart xnat-nginx
+sleep 5
+
+# Verify all nodes are healthy with retry logic
+echo ""
+echo "🔍 Verifying cluster health..."
+ALL_HEALTHY=false
+RETRY_COUNT=0
+MAX_RETRIES=6  # 6 retries x 10s = 60s additional wait
+
+while [ "$ALL_HEALTHY" = "false" ] && [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    ALL_HEALTHY=true
+
+    for container in $WEB_CONTAINERS; do
+        STATUS=$(docker exec xnat-nginx curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://$container:8080/ 2>/dev/null || echo "error")
+        if [ "$STATUS" = "302" ]; then
+            echo "   ✅ $container: OK"
+        else
+            echo "   ⏳ $container: $STATUS (still starting)"
+            ALL_HEALTHY=false
+        fi
+    done
+
+    if [ "$ALL_HEALTHY" = "false" ]; then
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            echo ""
+            echo "   ⏳ Some nodes still starting, waiting 10s... (attempt $RETRY_COUNT/$MAX_RETRIES)"
+            sleep 10
+            echo ""
+        fi
+    fi
+done
+
+if [ "$ALL_HEALTHY" = "false" ]; then
+    echo ""
+    echo "   ⚠️  Some nodes may still be starting. Check manually with:"
+    echo "   docker logs xnat-web-X 2>&1 | tail -20"
 fi
 
 echo ""

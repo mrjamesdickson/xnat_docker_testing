@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xnat-web
+  labels:
+    app: xnat-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xnat-web
+  template:
+    metadata:
+      labels:
+        app: xnat-web
+    spec:
+      containers:
+        - name: xnat-web
+          image: xnat/xnat-web:1.9.2.1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: XNAT_DB_HOST
+              value: "xnat-db-rw"
+            - name: XNAT_DB_PORT
+              value: "5432"
+            - name: XNAT_DB_NAME
+              value: "xnat"
+            - name: XNAT_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: xnat-db-credentials
+                  key: username
+            - name: XNAT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xnat-db-credentials
+                  key: password
+            - name: XNAT_MIN_HEAP
+              value: "256m"
+            - name: XNAT_MAX_HEAP
+              value: "4g"
+            - name: XNAT_EMAIL
+              value: "admin@example.org"
+          volumeMounts:
+            - name: xnat-archive
+              mountPath: /data/xnat/archive
+            - name: xnat-config
+              mountPath: /data/xnat/home/config
+            - name: xnat-logs
+              mountPath: /data/xnat/home/logs
+            - name: xnat-plugins
+              mountPath: /data/xnat/home/plugins
+      volumes:
+        - name: xnat-archive
+          emptyDir: {}
+        - name: xnat-config
+          emptyDir: {}
+        - name: xnat-logs
+          emptyDir: {}
+        - name: xnat-plugins
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xnat-web
+spec:
+  selector:
+    app: xnat-web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

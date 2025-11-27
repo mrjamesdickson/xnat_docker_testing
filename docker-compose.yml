@@ -41,7 +41,7 @@ services:
       - mock-llm
       - activemq
     environment:
-      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-01
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-01 -Dxnat.is_primary_node=true
       - XNAT_HOME=${XNAT_HOME}
       - XNAT_JMS_ENABLED=true
       - XNAT_JMS_BROKER_URL=tcp://activemq:61616
@@ -88,7 +88,7 @@ services:
       - mock-llm
       - activemq
     environment:
-      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-02
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-02 -Dxnat.is_primary_node=false
       - XNAT_HOME=${XNAT_HOME}
       - XNAT_JMS_ENABLED=true
       - XNAT_JMS_BROKER_URL=tcp://activemq:61616
@@ -135,7 +135,7 @@ services:
       - mock-llm
       - activemq
     environment:
-      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-03
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-03 -Dxnat.is_primary_node=false
       - XNAT_HOME=${XNAT_HOME}
       - XNAT_JMS_ENABLED=true
       - XNAT_JMS_BROKER_URL=tcp://activemq:61616
@@ -182,7 +182,7 @@ services:
       - mock-llm
       - activemq
     environment:
-      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-04
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-04 -Dxnat.is_primary_node=false
       - XNAT_HOME=${XNAT_HOME}
       - XNAT_JMS_ENABLED=true
       - XNAT_JMS_BROKER_URL=tcp://activemq:61616
@@ -229,7 +229,7 @@ services:
       - mock-llm
       - activemq
     environment:
-      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-05
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-05 -Dxnat.is_primary_node=false
       - XNAT_HOME=${XNAT_HOME}
       - XNAT_JMS_ENABLED=true
       - XNAT_JMS_BROKER_URL=tcp://activemq:61616
@@ -265,12 +265,6 @@ services:
     networks:
       - xnat-network
     depends_on:
-      - xnat-web
-      - xnat-web-2
-      - xnat-web-3
-      - xnat-web-4
-      - xnat-web-5
-    links:
       - xnat-web
       - xnat-web-2
       - xnat-web-3

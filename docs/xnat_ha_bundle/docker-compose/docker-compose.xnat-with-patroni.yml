@@ -1,0 +1,106 @@
+version: "3.8"
+
+services:
+  # --- Patroni / Postgres HA ---
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.12
+    container_name: patroni-etcd
+    command: >
+      /usr/local/bin/etcd
+      --data-dir=/etcd-data
+      --name=etcd0
+      --initial-advertise-peer-urls=http://patroni-etcd:2380
+      --listen-peer-urls=http://0.0.0.0:2380
+      --listen-client-urls=http://0.0.0.0:2379
+      --advertise-client-urls=http://patroni-etcd:2379
+      --initial-cluster-token=etcd-cluster-1
+      --initial-cluster=etcd0=http://patroni-etcd:2380
+      --initial-cluster-state=new
+    volumes:
+      - ./etcd-data:/etcd-data
+    networks:
+      - xnat-ha
+
+  patroni-primary:
+    image: ghcr.io/patroni/patroni:latest
+    container_name: patroni-primary
+    depends_on:
+      - etcd
+    environment:
+      PATRONI_CONFIG_DIR: /etc/patroni
+    volumes:
+      - ./patroni-primary.yml:/etc/patroni/patroni.yml:ro
+      - ./pgdata-primary:/var/lib/postgresql/data
+    networks:
+      - xnat-ha
+
+  patroni-replica1:
+    image: ghcr.io/patroni/patroni:latest
+    container_name: patroni-replica1
+    depends_on:
+      - etcd
+    environment:
+      PATRONI_CONFIG_DIR: /etc/patroni
+    volumes:
+      - ./patroni-replica1.yml:/etc/patroni/patroni.yml:ro
+      - ./pgdata-replica1:/var/lib/postgresql/data
+    networks:
+      - xnat-ha
+
+  haproxy:
+    image: haproxy:2.9
+    container_name: patroni-haproxy
+    depends_on:
+      - patroni-primary
+      - patroni-replica1
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "15432:5432"   # host access to DB (optional)
+    networks:
+      - xnat-ha
+
+  # --- XNAT web (Tomcat) ---
+  xnat-web:
+    image: xnat/xnat-web:1.9.2.1
+    container_name: xnat-web
+    depends_on:
+      - haproxy
+    environment:
+      XNAT_DB_HOST: patroni-haproxy
+      XNAT_DB_PORT: 5432
+      XNAT_DB_NAME: xnat
+      XNAT_DB_USER: xnat
+      XNAT_DB_PASSWORD: xnat
+
+      XNAT_MIN_HEAP: 256m
+      XNAT_MAX_HEAP: 4g
+      XNAT_EMAIL: admin@example.org
+    volumes:
+      - ./xnat-data/archive:/data/xnat/archive
+      - ./xnat-data/build:/data/xnat/build
+      - ./xnat-data/config:/data/xnat/home/config
+      - ./xnat-data/logs:/data/xnat/home/logs
+      - ./xnat-data/plugins:/data/xnat/home/plugins
+      - ./xnat-data/webapps:/usr/local/tomcat/webapps
+      - ./xnat-data/tomcat:/usr/local/tomcat/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - xnat-ha
+
+  # --- NGINX front-end ---
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: xnat-nginx
+    depends_on:
+      - xnat-web
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      - xnat-ha
+
+networks:
+  xnat-ha:
+    name: xnat-ha
