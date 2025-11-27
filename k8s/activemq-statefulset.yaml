@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: xnat-activemq
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: message-broker
+spec:
+  serviceName: xnat-activemq-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xnat-activemq
+  template:
+    metadata:
+      labels:
+        app: xnat-activemq
+        app.kubernetes.io/name: xnat
+        app.kubernetes.io/component: message-broker
+    spec:
+      containers:
+      - name: activemq
+        image: apache/activemq-classic:5.18.6
+        env:
+        - name: ACTIVEMQ_OPTS
+          value: "-Xms256m -Xmx512m"
+        ports:
+        - containerPort: 61616
+          name: openwire
+        - containerPort: 8161
+          name: web
+        - containerPort: 61613
+          name: stomp
+        volumeMounts:
+        - name: activemq-data
+          mountPath: /var/activemq/data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        readinessProbe:
+          tcpSocket:
+            port: 61616
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 61616
+          initialDelaySeconds: 30
+          periodSeconds: 30
+  volumeClaimTemplates:
+  - metadata:
+      name: activemq-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xnat-activemq-service
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: message-broker
+spec:
+  selector:
+    app: xnat-activemq
+  ports:
+  - port: 61616
+    targetPort: 61616
+    name: openwire
+  - port: 8161
+    targetPort: 8161
+    name: web
+  - port: 61613
+    targetPort: 61613
+    name: stomp

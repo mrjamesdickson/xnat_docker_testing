@@ -1,0 +1,92 @@
+# Persistent Volume Claims for XNAT
+# NOTE: These use dynamic provisioning. For production, configure your storage class
+# or create PersistentVolumes with your NFS/cloud storage backend.
+
+---
+# Archive storage - Shared across all pods (ReadWriteMany required)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xnat-archive-pvc
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteMany  # Required for multi-pod access
+  resources:
+    requests:
+      storage: 100Gi
+  # storageClassName: nfs  # Uncomment and set to your storage class
+
+---
+# Prearchive storage - Shared across all pods
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xnat-prearchive-pvc
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  # storageClassName: nfs
+
+---
+# Build storage - Shared across all pods
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xnat-build-pvc
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+  # storageClassName: nfs
+
+---
+# Plugins storage - Shared across all pods
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xnat-plugins-pvc
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  # storageClassName: nfs
+
+---
+# Example: NFS PersistentVolume (uncomment and configure for on-premise NFS)
+#
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: xnat-archive-pv
+# spec:
+#   capacity:
+#     storage: 100Gi
+#   accessModes:
+#     - ReadWriteMany
+#   nfs:
+#     server: nfs-server.local
+#     path: /exports/xnat/archive
+#   persistentVolumeReclaimPolicy: Retain

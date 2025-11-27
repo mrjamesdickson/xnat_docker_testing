@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xnat-web
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: web
+spec:
+  replicas: 2  # Initial replicas, HPA will manage this
+  selector:
+    matchLabels:
+      app: xnat-web
+  template:
+    metadata:
+      labels:
+        app: xnat-web
+        app.kubernetes.io/name: xnat
+        app.kubernetes.io/component: web
+    spec:
+      initContainers:
+      - name: wait-for-db
+        image: postgres:16.4-alpine
+        command:
+          - 'sh'
+          - '-c'
+          - 'until pg_isready -h xnat-db-service -p 5432; do echo waiting for database; sleep 2; done;'
+      containers:
+      - name: xnat
+        image: xnat/xnat-web:1.9.2.1
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: CATALINA_OPTS
+          value: "-Xms2g -Xmx4g -Dxnat.home=/data/xnat/home -Dsysadmin.node.id=$(POD_NAME)"
+        - name: XNAT_HOME
+          value: "/data/xnat/home"
+        - name: XNAT_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: xnat-secrets
+              key: datasource-password
+        - name: XNAT_JMS_ENABLED
+          value: "true"
+        - name: XNAT_JMS_BROKER_URL
+          value: "tcp://xnat-activemq-service:61616"
+        - name: XNAT_JMS_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: xnat-secrets
+              key: activemq-username
+        - name: XNAT_JMS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: xnat-secrets
+              key: activemq-password
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: xnat-config
+          mountPath: /data/xnat/home/config/xnat-conf.properties
+          subPath: xnat-conf.properties
+        - name: xnat-archive
+          mountPath: /data/xnat/archive
+        - name: xnat-prearchive
+          mountPath: /data/xnat/prearchive
+        - name: xnat-build
+          mountPath: /data/xnat/build
+        - name: xnat-plugins
+          mountPath: /data/xnat/home/plugins
+        - name: xnat-logs
+          mountPath: /data/xnat/home/logs
+        - name: xnat-cache
+          mountPath: /data/xnat/cache
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "6Gi"
+            cpu: "2000m"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 180
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+      volumes:
+      - name: xnat-config
+        configMap:
+          name: xnat-config
+      - name: xnat-archive
+        persistentVolumeClaim:
+          claimName: xnat-archive-pvc
+      - name: xnat-prearchive
+        persistentVolumeClaim:
+          claimName: xnat-prearchive-pvc
+      - name: xnat-build
+        persistentVolumeClaim:
+          claimName: xnat-build-pvc
+      - name: xnat-plugins
+        persistentVolumeClaim:
+          claimName: xnat-plugins-pvc
+      - name: xnat-logs
+        emptyDir: {}  # Per-pod ephemeral storage
+      - name: xnat-cache
+        emptyDir: {}  # Per-pod ephemeral storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xnat-web-service
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: web
+spec:
+  selector:
+    app: xnat-web
+  ports:
+  - port: 80
+    targetPort: 8080
+    name: http
+  type: ClusterIP

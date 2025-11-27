@@ -1,0 +1,67 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: xnat-ingress
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: ingress
+  annotations:
+    # Sticky sessions for XNAT
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "XNAT_STICKY"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+
+    # Large file upload support
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"  # Unlimited upload size
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+
+    # WebSocket support (for real-time features)
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-set-headers: "upgrade"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: xnat.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: xnat-web-service
+            port:
+              number: 80
+---
+# Optional: TLS configuration
+# Uncomment and configure for HTTPS
+#
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: xnat-ingress-tls
+#   namespace: xnat
+#   annotations:
+#     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+#     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+# spec:
+#   ingressClassName: nginx
+#   tls:
+#   - hosts:
+#     - xnat.example.com
+#     secretName: xnat-tls-secret
+#   rules:
+#   - host: xnat.example.com
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: xnat-web-service
+#             port:
+#               number: 80

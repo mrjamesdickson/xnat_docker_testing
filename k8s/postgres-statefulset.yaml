@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: xnat-db
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: database
+spec:
+  serviceName: xnat-db-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xnat-db
+  template:
+    metadata:
+      labels:
+        app: xnat-db
+        app.kubernetes.io/name: xnat
+        app.kubernetes.io/component: database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16.4-alpine
+        args:
+          - "-c"
+          - "shared_preload_libraries=pg_stat_statements"
+          - "-c"
+          - "pg_stat_statements.track=all"
+          - "-c"
+          - "max_connections=200"
+        env:
+        - name: POSTGRES_DB
+          value: xnat
+        - name: POSTGRES_USER
+          value: xnat
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: xnat-secrets
+              key: datasource-password
+        ports:
+        - containerPort: 5432
+          name: postgres
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        readinessProbe:
+          exec:
+            command:
+              - pg_isready
+              - -U
+              - xnat
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              - pg_isready
+              - -U
+              - xnat
+          initialDelaySeconds: 30
+          periodSeconds: 30
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xnat-db-service
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: database
+spec:
+  selector:
+    app: xnat-db
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: postgres
+  clusterIP: None  # Headless service for StatefulSet

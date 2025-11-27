@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xnat-config
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: config
+data:
+  xnat-conf.properties: |
+    # Database configuration
+    datasource.driver=org.postgresql.Driver
+    datasource.url=jdbc:postgresql://xnat-db-service:5432/xnat
+    datasource.username=xnat
+
+    # Hibernate settings
+    hibernate.dialect=org.hibernate.dialect.PostgreSQL9Dialect
+    hibernate.hbm2ddl.auto=update
+    hibernate.show_sql=false
+    hibernate.cache.use_second_level_cache=true
+    hibernate.cache.use_query_cache=true
+
+    # File upload limits
+    spring.http.multipart.max-file-size=1073741824
+    spring.http.multipart.max-request-size=1073741824
+
+    # Session timeout
+    session.timeout.minutes=60
+
+    # Archive paths
+    archive.location=/data/xnat/archive
+    prearchive.location=/data/xnat/prearchive
+    cache.location=/data/xnat/cache
+    build.location=/data/xnat/build
+
+    # System admin plugin settings
+    sysadmin.scheduler.enabled=true
+    sysadmin.worker.enabled=true
+    sysadmin.metrics.activemq.enabled=true
+    sysadmin.metrics.container.enabled=true
+    sysadmin.alerts.enabled=true
