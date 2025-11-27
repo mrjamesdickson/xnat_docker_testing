@@ -10,3 +10,7 @@ create role :"xnat_user" with login password :'xnat_user_pw';
 -- add missing grants for database
 ALTER DATABASE :"xnat_user" OWNER TO :"xnat_db";
 
+-- Enable pg_stat_statements extension for query analysis
+\echo # Enabling pg_stat_statements extension
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+

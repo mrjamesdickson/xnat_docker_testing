@@ -39,9 +39,202 @@ services:
     depends_on:
       - xnat-db
       - mock-llm
+      - activemq
     environment:
-      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME}
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-01
       - XNAT_HOME=${XNAT_HOME}
+      - XNAT_JMS_ENABLED=true
+      - XNAT_JMS_BROKER_URL=tcp://activemq:61616
+      - XNAT_JMS_USERNAME=admin
+      - XNAT_JMS_PASSWORD=admin
+
+  xnat-web-2:
+    container_name: xnat-web-2
+    build:
+      context: ./xnat
+      args:
+        XNAT_VERSION: ${XNAT_VERSION}
+        XNAT_SMTP_ENABLED: ${XNAT_SMTP_ENABLED}
+        XNAT_SMTP_HOSTNAME: ${XNAT_SMTP_HOSTNAME}
+        XNAT_SMTP_PORT: ${XNAT_SMTP_PORT}
+        XNAT_SMTP_AUTH: ${XNAT_SMTP_AUTH}
+        XNAT_SMTP_USERNAME: ${XNAT_SMTP_USERNAME}
+        XNAT_SMTP_PASSWORD: ${XNAT_SMTP_PASSWORD}
+        XNAT_SMTP_START_TLS: ${XNAT_SMTP_START_TLS}
+        XNAT_DATASOURCE_DRIVER: ${XNAT_DATASOURCE_DRIVER}
+        XNAT_DATASOURCE_URL: ${XNAT_DATASOURCE_URL}
+        XNAT_DATASOURCE_USERNAME: ${XNAT_DATASOURCE_USERNAME}
+        XNAT_DATASOURCE_PASSWORD: ${XNAT_DATASOURCE_PASSWORD}
+        TOMCAT_XNAT_FOLDER: ${TOMCAT_XNAT_FOLDER}
+        XNAT_ROOT: ${XNAT_ROOT}
+        XNAT_HOME: ${XNAT_HOME}
+        XNAT_EMAIL: ${XNAT_EMAIL}
+    expose:
+      - 8080
+    networks:
+      - xnat-network
+    extra_hosts:
+      - "demo02.xnatworks.io:192.168.1.67"
+    volumes:
+      - ./xnat/plugins:${XNAT_HOME}/plugins
+      - ./xnat/webapp:/usr/local/tomcat/webapps/ROOT
+      - ./xnat-data/home/logs-2:${XNAT_HOME}/logs
+      - ./xnat-data/archive:${XNAT_ROOT}/archive
+      - ./xnat-data/build:${XNAT_ROOT}/build
+      - ./xnat-data/cache-2:${XNAT_ROOT}/cache
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - xnat-db
+      - mock-llm
+      - activemq
+    environment:
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-02
+      - XNAT_HOME=${XNAT_HOME}
+      - XNAT_JMS_ENABLED=true
+      - XNAT_JMS_BROKER_URL=tcp://activemq:61616
+      - XNAT_JMS_USERNAME=admin
+      - XNAT_JMS_PASSWORD=admin
+
+  xnat-web-3:
+    container_name: xnat-web-3
+    build:
+      context: ./xnat
+      args:
+        XNAT_VERSION: ${XNAT_VERSION}
+        XNAT_SMTP_ENABLED: ${XNAT_SMTP_ENABLED}
+        XNAT_SMTP_HOSTNAME: ${XNAT_SMTP_HOSTNAME}
+        XNAT_SMTP_PORT: ${XNAT_SMTP_PORT}
+        XNAT_SMTP_AUTH: ${XNAT_SMTP_AUTH}
+        XNAT_SMTP_USERNAME: ${XNAT_SMTP_USERNAME}
+        XNAT_SMTP_PASSWORD: ${XNAT_SMTP_PASSWORD}
+        XNAT_SMTP_START_TLS: ${XNAT_SMTP_START_TLS}
+        XNAT_DATASOURCE_DRIVER: ${XNAT_DATASOURCE_DRIVER}
+        XNAT_DATASOURCE_URL: ${XNAT_DATASOURCE_URL}
+        XNAT_DATASOURCE_USERNAME: ${XNAT_DATASOURCE_USERNAME}
+        XNAT_DATASOURCE_PASSWORD: ${XNAT_DATASOURCE_PASSWORD}
+        TOMCAT_XNAT_FOLDER: ${TOMCAT_XNAT_FOLDER}
+        XNAT_ROOT: ${XNAT_ROOT}
+        XNAT_HOME: ${XNAT_HOME}
+        XNAT_EMAIL: ${XNAT_EMAIL}
+    expose:
+      - 8080
+    networks:
+      - xnat-network
+    extra_hosts:
+      - "demo02.xnatworks.io:192.168.1.67"
+    volumes:
+      - ./xnat/plugins:${XNAT_HOME}/plugins
+      - ./xnat/webapp:/usr/local/tomcat/webapps/ROOT
+      - ./xnat-data/home/logs-3:${XNAT_HOME}/logs
+      - ./xnat-data/archive:${XNAT_ROOT}/archive
+      - ./xnat-data/build:${XNAT_ROOT}/build
+      - ./xnat-data/cache-3:${XNAT_ROOT}/cache
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - xnat-db
+      - mock-llm
+      - activemq
+    environment:
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-03
+      - XNAT_HOME=${XNAT_HOME}
+      - XNAT_JMS_ENABLED=true
+      - XNAT_JMS_BROKER_URL=tcp://activemq:61616
+      - XNAT_JMS_USERNAME=admin
+      - XNAT_JMS_PASSWORD=admin
+
+  xnat-web-4:
+    container_name: xnat-web-4
+    build:
+      context: ./xnat
+      args:
+        XNAT_VERSION: ${XNAT_VERSION}
+        XNAT_SMTP_ENABLED: ${XNAT_SMTP_ENABLED}
+        XNAT_SMTP_HOSTNAME: ${XNAT_SMTP_HOSTNAME}
+        XNAT_SMTP_PORT: ${XNAT_SMTP_PORT}
+        XNAT_SMTP_AUTH: ${XNAT_SMTP_AUTH}
+        XNAT_SMTP_USERNAME: ${XNAT_SMTP_USERNAME}
+        XNAT_SMTP_PASSWORD: ${XNAT_SMTP_PASSWORD}
+        XNAT_SMTP_START_TLS: ${XNAT_SMTP_START_TLS}
+        XNAT_DATASOURCE_DRIVER: ${XNAT_DATASOURCE_DRIVER}
+        XNAT_DATASOURCE_URL: ${XNAT_DATASOURCE_URL}
+        XNAT_DATASOURCE_USERNAME: ${XNAT_DATASOURCE_USERNAME}
+        XNAT_DATASOURCE_PASSWORD: ${XNAT_DATASOURCE_PASSWORD}
+        TOMCAT_XNAT_FOLDER: ${TOMCAT_XNAT_FOLDER}
+        XNAT_ROOT: ${XNAT_ROOT}
+        XNAT_HOME: ${XNAT_HOME}
+        XNAT_EMAIL: ${XNAT_EMAIL}
+    expose:
+      - 8080
+    networks:
+      - xnat-network
+    extra_hosts:
+      - "demo02.xnatworks.io:192.168.1.67"
+    volumes:
+      - ./xnat/plugins:${XNAT_HOME}/plugins
+      - ./xnat/webapp:/usr/local/tomcat/webapps/ROOT
+      - ./xnat-data/home/logs-4:${XNAT_HOME}/logs
+      - ./xnat-data/archive:${XNAT_ROOT}/archive
+      - ./xnat-data/build:${XNAT_ROOT}/build
+      - ./xnat-data/cache-4:${XNAT_ROOT}/cache
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - xnat-db
+      - mock-llm
+      - activemq
+    environment:
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-04
+      - XNAT_HOME=${XNAT_HOME}
+      - XNAT_JMS_ENABLED=true
+      - XNAT_JMS_BROKER_URL=tcp://activemq:61616
+      - XNAT_JMS_USERNAME=admin
+      - XNAT_JMS_PASSWORD=admin
+
+  xnat-web-5:
+    container_name: xnat-web-5
+    build:
+      context: ./xnat
+      args:
+        XNAT_VERSION: ${XNAT_VERSION}
+        XNAT_SMTP_ENABLED: ${XNAT_SMTP_ENABLED}
+        XNAT_SMTP_HOSTNAME: ${XNAT_SMTP_HOSTNAME}
+        XNAT_SMTP_PORT: ${XNAT_SMTP_PORT}
+        XNAT_SMTP_AUTH: ${XNAT_SMTP_AUTH}
+        XNAT_SMTP_USERNAME: ${XNAT_SMTP_USERNAME}
+        XNAT_SMTP_PASSWORD: ${XNAT_SMTP_PASSWORD}
+        XNAT_SMTP_START_TLS: ${XNAT_SMTP_START_TLS}
+        XNAT_DATASOURCE_DRIVER: ${XNAT_DATASOURCE_DRIVER}
+        XNAT_DATASOURCE_URL: ${XNAT_DATASOURCE_URL}
+        XNAT_DATASOURCE_USERNAME: ${XNAT_DATASOURCE_USERNAME}
+        XNAT_DATASOURCE_PASSWORD: ${XNAT_DATASOURCE_PASSWORD}
+        TOMCAT_XNAT_FOLDER: ${TOMCAT_XNAT_FOLDER}
+        XNAT_ROOT: ${XNAT_ROOT}
+        XNAT_HOME: ${XNAT_HOME}
+        XNAT_EMAIL: ${XNAT_EMAIL}
+    expose:
+      - 8080
+    networks:
+      - xnat-network
+    extra_hosts:
+      - "demo02.xnatworks.io:192.168.1.67"
+    volumes:
+      - ./xnat/plugins:${XNAT_HOME}/plugins
+      - ./xnat/webapp:/usr/local/tomcat/webapps/ROOT
+      - ./xnat-data/home/logs-5:${XNAT_HOME}/logs
+      - ./xnat-data/archive:${XNAT_ROOT}/archive
+      - ./xnat-data/build:${XNAT_ROOT}/build
+      - ./xnat-data/cache-5:${XNAT_ROOT}/cache
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - xnat-db
+      - mock-llm
+      - activemq
+    environment:
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-05
+      - XNAT_HOME=${XNAT_HOME}
+      - XNAT_JMS_ENABLED=true
+      - XNAT_JMS_BROKER_URL=tcp://activemq:61616
+      - XNAT_JMS_USERNAME=admin
+      - XNAT_JMS_PASSWORD=admin
 
   xnat-db:
     container_name: xnat-db
@@ -52,7 +245,7 @@ services:
       - xnat-network
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
-      # 
+      #
       - ./postgres:/docker-entrypoint-initdb.d
     environment:
       - POSTGRES_PASSWORD=${XNAT_DATASOURCE_ADMIN_PASSWORD}
@@ -60,6 +253,7 @@ services:
       # variables for the sql script
       - XNAT_DATASOURCE_USERNAME=${XNAT_DATASOURCE_USERNAME}
       - XNAT_DATASOURCE_PASSWORD=${XNAT_DATASOURCE_PASSWORD}
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all -c max_connections=200
 
   xnat-nginx:
     container_name: xnat-nginx
@@ -72,8 +266,16 @@ services:
       - xnat-network
     depends_on:
       - xnat-web
+      - xnat-web-2
+      - xnat-web-3
+      - xnat-web-4
+      - xnat-web-5
     links:
       - xnat-web
+      - xnat-web-2
+      - xnat-web-3
+      - xnat-web-4
+      - xnat-web-5
 
   mock-llm:
     container_name: mock-llm
@@ -84,6 +286,21 @@ services:
       - ../xnat_chat_assistant_plugin/mocks/node:/app:ro
     expose:
       - 8081
+    networks:
+      - xnat-network
+    restart: unless-stopped
+
+  activemq:
+    container_name: xnat-activemq
+    image: apache/activemq-classic:5.18.6
+    ports:
+      - "61616:61616"   # OpenWire
+      - "8161:8161"     # Web Console
+      - "61613:61613"   # STOMP
+    environment:
+      - ACTIVEMQ_OPTS=-Xms256m -Xmx512m
+    volumes:
+      - ./activemq-data:/var/activemq/data
     networks:
       - xnat-network
     restart: unless-stopped
