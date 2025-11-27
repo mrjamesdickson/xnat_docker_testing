@@ -1,0 +1,402 @@
+# Patroni HA PostgreSQL for Kubernetes
+# Requires: etcd operator or etcd cluster already deployed
+#
+# Architecture:
+#   - etcd: Distributed consensus for leader election
+#   - patroni-0: PostgreSQL node (primary or replica)
+#   - patroni-1: PostgreSQL node (primary or replica)
+#   - patroni-2: PostgreSQL node (primary or replica)
+#   - patroni-service: Headless service for StatefulSet
+#   - patroni-primary: Service pointing to current primary (via label selector)
+#
+# Failover: Automatic - Patroni handles leader election via etcd
+
+---
+# ConfigMap for Patroni configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: patroni-config
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: database
+data:
+  PATRONI_KUBERNETES_LABELS: "{app: patroni}"
+  PATRONI_KUBERNETES_NAMESPACE: "xnat"
+  PATRONI_KUBERNETES_USE_ENDPOINTS: "true"
+  PATRONI_SCOPE: "xnat-cluster"
+  PATRONI_NAME: "${HOSTNAME}"
+  PATRONI_POSTGRESQL_DATA_DIR: "/var/lib/postgresql/data/pgdata"
+  PATRONI_POSTGRESQL_PGPASS: "/tmp/pgpass"
+  PATRONI_POSTGRESQL_LISTEN: "0.0.0.0:5432"
+  PATRONI_RESTAPI_LISTEN: "0.0.0.0:8008"
+  PATRONI_SUPERUSER_USERNAME: "postgres"
+  PATRONI_REPLICATION_USERNAME: "replicator"
+  PATRONI_POSTGRESQL_PARAMETERS: |
+    max_connections: 200
+    shared_buffers: 256MB
+    wal_level: replica
+    hot_standby: "on"
+    max_wal_senders: 10
+    max_replication_slots: 10
+    wal_keep_size: 64MB
+    shared_preload_libraries: pg_stat_statements
+    pg_stat_statements.track: all
+
+---
+# Secret for PostgreSQL passwords
+apiVersion: v1
+kind: Secret
+metadata:
+  name: patroni-secrets
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: database
+type: Opaque
+stringData:
+  PATRONI_SUPERUSER_PASSWORD: "supersecret"
+  PATRONI_REPLICATION_PASSWORD: "replpassword"
+  PATRONI_admin_PASSWORD: "xnat"
+  # XNAT database user
+  POSTGRES_USER: "xnat"
+  POSTGRES_PASSWORD: "xnat"
+
+---
+# etcd StatefulSet for Patroni leader election
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: etcd
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: etcd
+spec:
+  serviceName: etcd
+  replicas: 3
+  selector:
+    matchLabels:
+      app: etcd
+  template:
+    metadata:
+      labels:
+        app: etcd
+        app.kubernetes.io/name: xnat
+        app.kubernetes.io/component: etcd
+    spec:
+      containers:
+      - name: etcd
+        image: quay.io/coreos/etcd:v3.5.12
+        ports:
+        - containerPort: 2379
+          name: client
+        - containerPort: 2380
+          name: peer
+        env:
+        - name: ETCD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ETCD_INITIAL_CLUSTER
+          value: "etcd-0=http://etcd-0.etcd:2380,etcd-1=http://etcd-1.etcd:2380,etcd-2=http://etcd-2.etcd:2380"
+        - name: ETCD_INITIAL_CLUSTER_TOKEN
+          value: "etcd-cluster-xnat"
+        - name: ETCD_INITIAL_CLUSTER_STATE
+          value: "new"
+        - name: ETCD_DATA_DIR
+          value: "/var/lib/etcd"
+        - name: ETCD_LISTEN_PEER_URLS
+          value: "http://0.0.0.0:2380"
+        - name: ETCD_LISTEN_CLIENT_URLS
+          value: "http://0.0.0.0:2379"
+        - name: ETCD_ADVERTISE_CLIENT_URLS
+          value: "http://$(ETCD_NAME).etcd:2379"
+        - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
+          value: "http://$(ETCD_NAME).etcd:2380"
+        volumeMounts:
+        - name: etcd-data
+          mountPath: /var/lib/etcd
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 2379
+          initialDelaySeconds: 10
+          periodSeconds: 10
+  volumeClaimTemplates:
+  - metadata:
+      name: etcd-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
+
+---
+# Headless service for etcd
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: etcd
+spec:
+  clusterIP: None
+  ports:
+  - port: 2379
+    name: client
+  - port: 2380
+    name: peer
+  selector:
+    app: etcd
+
+---
+# Patroni StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: patroni
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: database
+    cluster-name: xnat-cluster
+spec:
+  serviceName: patroni
+  replicas: 3
+  selector:
+    matchLabels:
+      app: patroni
+  template:
+    metadata:
+      labels:
+        app: patroni
+        app.kubernetes.io/name: xnat
+        app.kubernetes.io/component: database
+        cluster-name: xnat-cluster
+    spec:
+      serviceAccountName: patroni
+      containers:
+      - name: patroni
+        image: ghcr.io/zalando/spilo-16:3.2-p2
+        ports:
+        - containerPort: 5432
+          name: postgresql
+        - containerPort: 8008
+          name: patroni
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: PATRONI_KUBERNETES_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: PATRONI_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: PATRONI_SCOPE
+          value: "xnat-cluster"
+        - name: PATRONI_KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: PATRONI_KUBERNETES_LABELS
+          value: "{app: patroni, cluster-name: xnat-cluster}"
+        - name: PATRONI_KUBERNETES_USE_ENDPOINTS
+          value: "true"
+        - name: PATRONI_SUPERUSER_USERNAME
+          value: "postgres"
+        - name: PATRONI_SUPERUSER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: patroni-secrets
+              key: PATRONI_SUPERUSER_PASSWORD
+        - name: PATRONI_REPLICATION_USERNAME
+          value: "replicator"
+        - name: PATRONI_REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: patroni-secrets
+              key: PATRONI_REPLICATION_PASSWORD
+        - name: PATRONI_POSTGRESQL_DATA_DIR
+          value: "/home/postgres/pgdata/pgroot/data"
+        - name: PATRONI_POSTGRESQL_PGPASS
+          value: "/tmp/pgpass"
+        - name: PATRONI_POSTGRESQL_LISTEN
+          value: "0.0.0.0:5432"
+        - name: PATRONI_RESTAPI_LISTEN
+          value: "0.0.0.0:8008"
+        - name: PATRONI_RESTAPI_CONNECT_ADDRESS
+          value: "$(POD_NAME).patroni:8008"
+        - name: PATRONI_POSTGRESQL_CONNECT_ADDRESS
+          value: "$(POD_NAME).patroni:5432"
+        - name: ETCDCTL_ENDPOINTS
+          value: "http://etcd-0.etcd:2379,http://etcd-1.etcd:2379,http://etcd-2.etcd:2379"
+        - name: PATRONI_ETCD3_HOSTS
+          value: "etcd-0.etcd:2379,etcd-1.etcd:2379,etcd-2.etcd:2379"
+        # Bootstrap config for XNAT database
+        - name: PATRONI_admin_OPTIONS
+          value: "createdb"
+        - name: PATRONI_admin_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: patroni-secrets
+              key: PATRONI_admin_PASSWORD
+        volumeMounts:
+        - name: pgdata
+          mountPath: /home/postgres/pgdata
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 8008
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /liveness
+            port: 8008
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+      initContainers:
+      - name: wait-for-etcd
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z etcd-0.etcd 2379; do echo waiting for etcd; sleep 2; done;']
+  volumeClaimTemplates:
+  - metadata:
+      name: pgdata
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 20Gi
+
+---
+# ServiceAccount for Patroni (needed for K8s API access)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: patroni
+  namespace: xnat
+
+---
+# Role for Patroni to manage endpoints
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: patroni
+  namespace: xnat
+rules:
+- apiGroups: [""]
+  resources: ["endpoints", "pods"]
+  verbs: ["get", "list", "watch", "patch", "update", "create", "delete"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding for Patroni
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: patroni
+  namespace: xnat
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: patroni
+subjects:
+- kind: ServiceAccount
+  name: patroni
+  namespace: xnat
+
+---
+# Headless service for Patroni StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: patroni
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: database
+spec:
+  clusterIP: None
+  ports:
+  - port: 5432
+    name: postgresql
+  - port: 8008
+    name: patroni
+  selector:
+    app: patroni
+
+---
+# Service for the primary (read-write)
+# Patroni updates the endpoint automatically
+apiVersion: v1
+kind: Service
+metadata:
+  name: patroni-primary
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: postgresql
+  selector:
+    app: patroni
+    # Note: Patroni manages labels to point to current primary
+    # In practice, use the xnat-cluster endpoint managed by Patroni
+
+---
+# Service for replicas (read-only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: patroni-replica
+  namespace: xnat
+  labels:
+    app.kubernetes.io/name: xnat
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: postgresql
+  selector:
+    app: patroni
+    # Will include all nodes - use for read replicas

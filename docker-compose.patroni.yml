@@ -1,0 +1,133 @@
+# Docker Compose override for Patroni HA PostgreSQL
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.patroni.yml up -d
+#
+# This replaces the single xnat-db with a Patroni HA cluster:
+#   - etcd: Leader election
+#   - patroni-primary: PostgreSQL primary
+#   - patroni-replica: PostgreSQL replica
+#   - haproxy: Routes to current primary
+#
+# XNAT connects to haproxy:5432 which always routes to the current primary
+#
+# For demo: Switch between simple and HA mode:
+#   Simple mode:    docker-compose up -d
+#   HA mode:        docker-compose -f docker-compose.yml -f docker-compose.patroni.yml up -d
+
+services:
+  # Disable the simple postgres
+  xnat-db:
+    profiles:
+      - disabled
+
+  # etcd for Patroni leader election
+  patroni-etcd:
+    image: quay.io/coreos/etcd:v3.5.12
+    container_name: patroni-etcd
+    command: >
+      /usr/local/bin/etcd
+      --data-dir=/etcd-data
+      --name=etcd0
+      --initial-advertise-peer-urls=http://patroni-etcd:2380
+      --listen-peer-urls=http://0.0.0.0:2380
+      --listen-client-urls=http://0.0.0.0:2379
+      --advertise-client-urls=http://patroni-etcd:2379
+      --initial-cluster-token=etcd-cluster-xnat
+      --initial-cluster=etcd0=http://patroni-etcd:2380
+      --initial-cluster-state=new
+    volumes:
+      - ./patroni-data/etcd:/etcd-data
+    networks:
+      - xnat-network
+    restart: unless-stopped
+
+  # Patroni primary node
+  patroni-primary:
+    image: ghcr.io/patroni/patroni:latest
+    container_name: patroni-primary
+    depends_on:
+      - patroni-etcd
+    environment:
+      PATRONI_CONFIG_DIR: /etc/patroni
+    volumes:
+      - ./patroni/patroni-primary.yml:/etc/patroni/patroni.yml:ro
+      - ./patroni-data/primary:/var/lib/postgresql/data
+    networks:
+      - xnat-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Patroni replica node
+  patroni-replica:
+    image: ghcr.io/patroni/patroni:latest
+    container_name: patroni-replica
+    depends_on:
+      - patroni-etcd
+      - patroni-primary
+    environment:
+      PATRONI_CONFIG_DIR: /etc/patroni
+    volumes:
+      - ./patroni/patroni-replica.yml:/etc/patroni/patroni.yml:ro
+      - ./patroni-data/replica:/var/lib/postgresql/data
+    networks:
+      - xnat-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # HAProxy load balancer - routes to current primary
+  patroni-haproxy:
+    image: haproxy:2.9
+    container_name: patroni-haproxy
+    depends_on:
+      - patroni-primary
+      - patroni-replica
+    volumes:
+      - ./patroni/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "15432:5432"   # Postgres cluster on host:15432
+      - "7000:7000"    # HAProxy stats UI
+    networks:
+      - xnat-network
+    restart: unless-stopped
+
+  # Override XNAT to use HAProxy instead of xnat-db
+  xnat-web:
+    depends_on:
+      - patroni-haproxy
+      - mock-llm
+      - activemq
+    environment:
+      - CATALINA_OPTS=-Xms${XNAT_MIN_HEAP} -Xmx${XNAT_MAX_HEAP} -Dxnat.home=${XNAT_HOME} -Dsysadmin.node.id=xnat-node-01 -Dxnat.is_primary_node=true
+
+  xnat-web-2:
+    depends_on:
+      - patroni-haproxy
+      - mock-llm
+      - activemq
+
+  xnat-web-3:
+    depends_on:
+      - patroni-haproxy
+      - mock-llm
+      - activemq
+
+  xnat-web-4:
+    depends_on:
+      - patroni-haproxy
+      - mock-llm
+      - activemq
+
+  xnat-web-5:
+    depends_on:
+      - patroni-haproxy
+      - mock-llm
+      - activemq
