@@ -6,8 +6,8 @@ restapi:
   listen: 0.0.0.0:8008
   connect_address: patroni-primary:8008
 
-etcd:
-  host: patroni-etcd:2379
+etcd3:
+  hosts: patroni-etcd:2379
 
 bootstrap:
   dcs:

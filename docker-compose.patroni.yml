@@ -16,10 +16,17 @@
 #   HA mode:        docker-compose -f docker-compose.yml -f docker-compose.patroni.yml up -d
 
 services:
-  # Disable the simple postgres
+  # Replace xnat-db with socat proxy to HAProxy
+  # This keeps the xnat-db hostname working while routing to Patroni
   xnat-db:
-    profiles:
-      - disabled
+    image: alpine/socat:latest
+    container_name: xnat-db-proxy
+    command: TCP-LISTEN:5432,fork,reuseaddr TCP:patroni-haproxy:5432
+    depends_on:
+      - patroni-haproxy
+    networks:
+      - xnat-network
+    restart: unless-stopped
 
   # etcd for Patroni leader election
   patroni-etcd:
@@ -44,15 +51,17 @@ services:
 
   # Patroni primary node
   patroni-primary:
-    image: ghcr.io/patroni/patroni:latest
+    image: ongres/patroni:latest
     container_name: patroni-primary
     depends_on:
       - patroni-etcd
+    command: patroni /etc/patroni/patroni.yml
     environment:
       PATRONI_CONFIG_DIR: /etc/patroni
     volumes:
       - ./patroni/patroni-primary.yml:/etc/patroni/patroni.yml:ro
       - ./patroni-data/primary:/var/lib/postgresql/data
+      - patroni-primary-run:/run/postgresql
     networks:
       - xnat-network
     restart: unless-stopped
@@ -64,16 +73,18 @@ services:
 
   # Patroni replica node
   patroni-replica:
-    image: ghcr.io/patroni/patroni:latest
+    image: ongres/patroni:latest
     container_name: patroni-replica
     depends_on:
       - patroni-etcd
       - patroni-primary
+    command: patroni /etc/patroni/patroni.yml
     environment:
       PATRONI_CONFIG_DIR: /etc/patroni
     volumes:
       - ./patroni/patroni-replica.yml:/etc/patroni/patroni.yml:ro
       - ./patroni-data/replica:/var/lib/postgresql/data
+      - patroni-replica-run:/run/postgresql
     networks:
       - xnat-network
     restart: unless-stopped
@@ -94,14 +105,15 @@ services:
       - ./patroni/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     ports:
       - "15432:5432"   # Postgres cluster on host:15432
-      - "7000:7000"    # HAProxy stats UI
+      - "7001:7000"    # HAProxy stats UI (7001 on host, 7000 in container)
     networks:
       - xnat-network
     restart: unless-stopped
 
-  # Override XNAT to use HAProxy instead of xnat-db
+  # Override XNAT to also depend on HAProxy
   xnat-web:
     depends_on:
+      - xnat-db
       - patroni-haproxy
       - mock-llm
       - activemq
@@ -110,24 +122,32 @@ services:
 
   xnat-web-2:
     depends_on:
+      - xnat-db
       - patroni-haproxy
       - mock-llm
       - activemq
 
   xnat-web-3:
     depends_on:
+      - xnat-db
       - patroni-haproxy
       - mock-llm
       - activemq
 
   xnat-web-4:
     depends_on:
+      - xnat-db
       - patroni-haproxy
       - mock-llm
       - activemq
 
   xnat-web-5:
     depends_on:
+      - xnat-db
       - patroni-haproxy
       - mock-llm
       - activemq
+
+volumes:
+  patroni-primary-run:
+  patroni-replica-run:

@@ -122,16 +122,33 @@ migrate_to_patroni() {
         exit 0
     fi
 
-    # Stop services
+    # Stop services (both modes)
+    docker-compose -f docker-compose.yml -f docker-compose.patroni.yml down 2>/dev/null || true
     docker-compose down 2>/dev/null || true
 
-    # Start simple postgres temporarily for dump
+    # Restore original .env for simple mode dump
+    if [ -f ".env.backup" ]; then
+        cp .env.backup .env
+    fi
+
+    # Start simple postgres temporarily for dump (base compose only)
+    echo "Starting PostgreSQL for dump..."
     docker-compose up -d xnat-db
-    sleep 5
+
+    # Wait for postgres to be ready
+    echo "Waiting for PostgreSQL to be ready..."
+    for i in {1..30}; do
+        if docker exec xnat-db pg_isready -U xnat -d xnat >/dev/null 2>&1; then
+            echo "PostgreSQL is ready."
+            break
+        fi
+        echo "  Waiting... ($i/30)"
+        sleep 2
+    done
 
     # Dump the database
     echo "Dumping database..."
-    docker exec xnat-db pg_dump -U xnat -d xnat > /tmp/xnat_dump.sql
+    docker exec xnat-db pg_dump -h localhost -U xnat -d xnat > /tmp/xnat_dump.sql
 
     # Stop simple postgres
     docker-compose down
@@ -141,11 +158,21 @@ migrate_to_patroni() {
 
     # Wait for cluster to be ready
     echo "Waiting for Patroni cluster to initialize..."
-    sleep 30
+    for i in {1..60}; do
+        if docker exec patroni-primary patronictl list 2>/dev/null | grep -q "Leader"; then
+            echo "Patroni cluster is ready."
+            break
+        fi
+        echo "  Waiting for Patroni... ($i/60)"
+        sleep 5
+    done
+
+    # Wait a bit more for postgres to be fully ready
+    sleep 5
 
     # Restore to Patroni
     echo "Restoring database to Patroni..."
-    docker exec -i patroni-primary psql -U xnat -d xnat < /tmp/xnat_dump.sql
+    docker exec -i patroni-primary psql -h localhost -U xnat -d xnat < /tmp/xnat_dump.sql
 
     echo ""
     echo "=== Migration complete ==="

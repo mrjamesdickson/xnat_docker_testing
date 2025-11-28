@@ -260,6 +260,7 @@ services:
     image: nginx:${NGINX_VERSION}
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/status.html:/usr/share/nginx/html/status.html
     ports:
       - "${XNAT_HOST_PORT:-80}:80"
     networks:
