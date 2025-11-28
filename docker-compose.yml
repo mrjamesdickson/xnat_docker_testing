@@ -265,12 +265,7 @@ services:
       - "${XNAT_HOST_PORT:-80}:80"
     networks:
       - xnat-network
-    depends_on:
-      - xnat-web
-      - xnat-web-2
-      - xnat-web-3
-      - xnat-web-4
-      - xnat-web-5
+    # No depends_on - nginx starts first to serve status page during startup
 
   mock-llm:
     container_name: mock-llm

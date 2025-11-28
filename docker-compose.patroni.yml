@@ -5,8 +5,9 @@
 #
 # This replaces the single xnat-db with a Patroni HA cluster:
 #   - etcd: Leader election
-#   - patroni-primary: PostgreSQL primary
-#   - patroni-replica: PostgreSQL replica
+#   - patroni-primary: PostgreSQL node 1
+#   - patroni-replica: PostgreSQL node 2
+#   - patroni-replica2: PostgreSQL node 3
 #   - haproxy: Routes to current primary
 #
 # XNAT connects to haproxy:5432 which always routes to the current primary
@@ -49,7 +50,7 @@ services:
       - xnat-network
     restart: unless-stopped
 
-  # Patroni primary node
+  # Patroni node 1 (initial primary)
   patroni-primary:
     image: ongres/patroni:latest
     container_name: patroni-primary
@@ -71,7 +72,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # Patroni replica node
+  # Patroni node 2 (replica)
   patroni-replica:
     image: ongres/patroni:latest
     container_name: patroni-replica
@@ -94,6 +95,29 @@ services:
       timeout: 5s
       retries: 3
 
+  # Patroni node 3 (replica)
+  patroni-replica2:
+    image: ongres/patroni:latest
+    container_name: patroni-replica2
+    depends_on:
+      - patroni-etcd
+      - patroni-primary
+    command: patroni /etc/patroni/patroni.yml
+    environment:
+      PATRONI_CONFIG_DIR: /etc/patroni
+    volumes:
+      - ./patroni/patroni-replica2.yml:/etc/patroni/patroni.yml:ro
+      - ./patroni-data/replica2:/var/lib/postgresql/data
+      - patroni-replica2-run:/run/postgresql
+    networks:
+      - xnat-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   # HAProxy load balancer - routes to current primary
   patroni-haproxy:
     image: haproxy:2.9
@@ -101,6 +125,7 @@ services:
     depends_on:
       - patroni-primary
       - patroni-replica
+      - patroni-replica2
     volumes:
       - ./patroni/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     ports:
@@ -151,3 +176,4 @@ services:
 volumes:
   patroni-primary-run:
   patroni-replica-run:
+  patroni-replica2-run:
